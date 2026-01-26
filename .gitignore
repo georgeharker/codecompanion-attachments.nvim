@@ -1,0 +1,18 @@
+# Test files
+test_load.lua
+test_config.lua
+
+# Neovim
+*.swp
+*.swo
+*~
+
+# Lazy.nvim
+lazy-lock.json
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
