@@ -2,7 +2,7 @@
 
 Document and image attachment support for [CodeCompanion.nvim](https://codecompanion.olimorris.dev/).
 
-Send PDFs and documents to Claude using Anthropic's efficient document block format - reducing token usage by 99.5% (from ~210k tokens to ~1k tokens per document).
+Send PDFs and documents to Claude using Anthropic's efficient document block format - which is both more efficient and enabled pdf / docx digestion.
 
 ## Features
 
@@ -183,16 +183,6 @@ adapters = {
 ## How It Works
 
 The extension uses Anthropic's [document block format](https://docs.anthropic.com/en/docs/build-with-claude/pdf-support) to efficiently send document contents:
-
-**Traditional approach** (base64 text):
-- ~280 characters per 1KB of file size
-- A 750KB PDF = ~210,000 tokens
-- Often exceeds API limits (200K tokens)
-
-**Document block approach** (this extension):
-- ~1.33 characters per 1KB of file size
-- Same 750KB PDF = ~1,000 tokens
-- **99.5% token reduction**
 
 ### Technical Implementation
 
