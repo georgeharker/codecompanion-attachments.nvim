@@ -74,7 +74,6 @@ local providers = {
 
 	---The Snacks.nvim provider
 	---@param SlashCommand CodeCompanion.SlashCommand
-	---@return nil
 	snacks = function(SlashCommand)
 		local snacks = require("codecompanion.providers.slash_commands.snacks")
 		snacks = snacks.new({
@@ -104,7 +103,7 @@ local providers = {
 	---@return nil
 	telescope = function(SlashCommand)
 		local telescope = require("codecompanion.providers.slash_commands.telescope")
-		telescope = telescope.new({
+		telescope = telescope.new({ ---@diagnostic disable-line: missing-fields
 			title = CONSTANTS.PROMPT,
 			output = function(selection)
 				local path = selection[1] or selection

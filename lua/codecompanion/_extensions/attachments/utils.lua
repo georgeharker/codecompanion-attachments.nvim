@@ -60,6 +60,10 @@ vim.api.nvim_create_autocmd("VimLeavePre", {
 ---@field file_id? string
 ---@field attachment_type? string "image"|"document"
 
+---@alias CodeCompanion.Attachment.Preprocessor
+--- | fun(source: string, ctx?: table, cb: fun(result: string|CodeCompanion.Attachment)):nil
+--- | fun(source: string, ctx?: table, cb: nil): string|CodeCompanion.Attachment
+
 ---Get image file extensions
 ---@return string[]
 function M.get_image_filetypes()
@@ -244,10 +248,7 @@ function M.encode_attachment(attachment)
 end
 
 ---Load attachment from file path
----@param path string
----@param ctx? table
----@param cb? function
----@return string|CodeCompanion.Attachment
+---@type CodeCompanion.Attachment.Preprocessor
 function M.from_path(path, ctx, cb)
 	-- Validate the attachment
 	local ok, err = validate_attachment(path)
@@ -289,10 +290,7 @@ function M.from_path(path, ctx, cb)
 end
 
 ---Load attachment from URL
----@param url string
----@param ctx? table
----@param cb? function
----@return string|CodeCompanion.Attachment
+---@type CodeCompanion.Attachment.Preprocessor
 function M.from_url(url, ctx, cb)
 	ctx = ctx or {}
 
