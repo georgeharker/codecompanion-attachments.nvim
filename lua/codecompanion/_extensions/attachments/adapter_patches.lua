@@ -3,99 +3,109 @@ local log = require("codecompanion.utils.log")
 
 local M = {}
 
----Transform attachment messages for Anthropic adapter
----@param messages table List of messages
+---Transform attachment message for Anthropic (simple pre-processing)
+---@param m table The message to transform
 ---@param adapter table The adapter instance
----@return table Transformed messages
-local function transform_anthropic_attachments(messages, adapter)
-    local transformed = {}
+---@return table|nil Transformed message or nil to skip
+local function transform_anthropic_attachment(m, adapter)
+    -- Only process attachment messages
+    if not (m._meta and m._meta.tag == "attachment" and m.context) then
+        return m
+    end
     
-    log:debug("Anthropic transformer: Processing %d messages", #messages)
+    log:debug("Found attachment message: source=%s, mimetype=%s", 
+        m.context.source or "base64", m.context.mimetype or "nil")
     
-    for i, m in ipairs(messages) do
-        log:debug("Message %d: role=%s, has_meta=%s, tag=%s, has_context=%s", 
-            i, m.role or "nil", 
-            m._meta and "yes" or "no",
-            m._meta and m._meta.tag or "nil",
-            m.context and "yes" or "no")
+    -- Check if adapter supports attachments
+    if not (adapter.opts and adapter.opts.attachment_upload) then
+        log:warn("Adapter does not support attachments, skipping")
+        return nil
+    end
+    
+    -- Transform based on source type
+    if m.context.source == "url" then
+        log:debug("Transforming URL attachment: %s", m.context.url)
+        m.content = {
+            {
+                type = "document",
+                source = {
+                    type = "url",
+                    url = m.context.url,
+                },
+            },
+        }
+    elseif m.context.source == "file" then
+        log:debug("Transforming Files API attachment: %s", m.context.file_id)
+        if adapter.opts.file_api then
+            m.content = {
+                {
+                    type = "document",
+                    source = {
+                        type = "file",
+                        file_id = m.context.file_id,
+                    },
+                },
+            }
+        else
+            log:warn("File API not supported, skipping attachment")
+            return nil
+        end
+    else
+        -- Base64-encoded document or image
+        log:debug("Transforming base64 attachment: type=%s, mime=%s, size=%d bytes", 
+            m.context.attachment_type or "unknown",
+            m.context.mimetype or "unknown",
+            m.content and #m.content or 0)
         
-        -- Handle attachment messages
-        if m._meta and m._meta.tag == "attachment" and m.context then
-            log:debug("Found attachment message: source=%s, mimetype=%s", 
-                m.context.source or "nil", m.context.mimetype or "nil")
-            
-            -- Check if adapter supports attachments (either vision for images or attachment_upload for docs)
-            local supports_attachments = (adapter.opts and adapter.opts.attachment_upload) 
-                or (adapter.opts and adapter.opts.vision)
-            
-            log:debug("Adapter supports attachments: %s (attachment_upload=%s, vision=%s)",
-                supports_attachments and "yes" or "no",
-                adapter.opts and adapter.opts.attachment_upload or "nil",
-                adapter.opts and adapter.opts.vision or "nil")
-            
-            if supports_attachments then
-                if m.context.source == "url" then
-                    log:debug("Transforming URL attachment: %s", m.context.url)
-                    -- URL-based document
-                    m.content = {
-                        {
-                            type = "document",
-                            source = {
-                                type = "url",
-                                url = m.context.url,
-                            },
-                        },
-                    }
-                elseif m.context.source == "file" then
-                    log:debug("Transforming Files API attachment: %s", m.context.file_id)
-                    -- Files API reference - requires file_api capability
-                    if adapter.opts.file_api then
-                        m.content = {
-                            {
-                                type = "document",
-                                source = {
-                                    type = "file",
-                                    file_id = m.context.file_id,
-                                },
-                            },
-                        }
-                    else
-                        log:warn("File API not supported, skipping attachment")
-                        m = nil
-                    end
-                else
-                    log:debug("Transforming base64 attachment: type=%s, size=%d bytes", 
-                        m.context.attachment_type or "unknown",
-                        m.content and #m.content or 0)
-                    -- Base64-encoded document or image
-                    local content_data = m.content
-                    local content_type = m.context.attachment_type == "image" and "image" or "document"
-                    
-                    m.content = {
-                        {
-                            type = content_type,
-                            source = {
-                                type = "base64",
-                                media_type = m.context.mimetype or "application/pdf",
-                                data = content_data,
-                            },
-                        },
-                    }
-                    log:debug("Transformed to %s content block", content_type)
-                end
-            else
-                log:warn("Adapter does not support attachments, skipping")
-                m = nil
+        local content_data = m.content
+        local content_type = m.context.attachment_type == "image" and "image" or "document"
+        
+        m.content = {
+            {
+                type = content_type,
+                source = {
+                    type = "base64",
+                    media_type = m.context.mimetype or "application/pdf",
+                    data = content_data,
+                },
+            },
+        }
+        log:debug("Transformed to %s content block", content_type)
+    end
+    
+    return m
+end
+
+---Patch Anthropic adapter to handle attachments
+---@param adapter table The adapter to patch
+---@return table The patched adapter
+local function patch_anthropic_adapter(adapter)
+    local original_form_messages = adapter.handlers.form_messages
+    
+    adapter.handlers.form_messages = function(self, messages)
+        log:debug("Patched Anthropic form_messages called with %d messages", #messages)
+        
+        -- Pre-process: Transform any attachment messages
+        local processed = {}
+        for _, m in ipairs(messages) do
+            local transformed = transform_anthropic_attachment(m, self)
+            if transformed then
+                table.insert(processed, transformed)
             end
         end
         
-        if m then
-            table.insert(transformed, m)
-        end
+        log:debug("After attachment transformation: %d messages", #processed)
+        
+        -- Call original form_messages with transformed messages
+        local result = original_form_messages(self, processed)
+        
+        log:debug("Original form_messages returned: %s", vim.inspect(result))
+        
+        return result
     end
     
-    log:debug("Anthropic transformer: Returning %d messages", #transformed)
-    return transformed
+    log:info("Patched Anthropic adapter for attachment support")
+    return adapter
 end
 
 ---Transform attachment messages for Gemini adapter
@@ -140,7 +150,6 @@ end
 
 ---Adapter-specific transformation functions
 local transformers = {
-    anthropic = transform_anthropic_attachments,
     gemini = transform_gemini_attachments,
     gemini_cli = transform_gemini_attachments,
 }
@@ -150,34 +159,23 @@ local transformers = {
 ---@param adapter_name string The name of the adapter
 ---@return table The patched adapter
 local function patch_adapter(adapter, adapter_name)
-    local transformer = transformers[adapter_name]
+    if adapter_name == "anthropic" then
+        return patch_anthropic_adapter(adapter)
+    end
     
+    -- For other adapters, use the simple transformer approach
+    local transformer = transformers[adapter_name]
     if not transformer then
         return adapter
     end
     
-    -- Store original form_messages handler
     local original_form_messages = adapter.handlers.form_messages
-    
-    -- Wrap form_messages to apply attachment transformations BEFORE original processing
     adapter.handlers.form_messages = function(self, messages)
-        log:debug("Patched form_messages called for %s with %d messages", adapter_name, #messages)
-        
-        -- First transform attachments while we still have _meta tags
         local transformed = transformer(messages, self)
-        
-        log:debug("After transformation: %d messages", #transformed)
-        
-        -- Then run the original form_messages on the transformed messages
-        local formed = original_form_messages(self, transformed)
-        
-        log:debug("After original form_messages: %d messages", #formed)
-        
-        return formed
+        return original_form_messages(self, transformed)
     end
     
     log:info("Patched adapter '%s' for attachment support", adapter_name)
-    
     return adapter
 end
 
@@ -191,8 +189,8 @@ function M.install()
     adapters.resolve = function(adapter_name, adapter_opts)
         local adapter = original_resolve(adapter_name, adapter_opts)
         
-        -- Patch if this adapter has a transformer
-        if transformers[adapter_name] then
+        -- Patch if this adapter has support
+        if adapter_name == "anthropic" or transformers[adapter_name] then
             adapter = patch_adapter(adapter, adapter_name)
         end
         
