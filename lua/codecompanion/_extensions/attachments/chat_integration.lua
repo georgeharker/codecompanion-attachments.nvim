@@ -9,7 +9,7 @@ local M = {}
 function M.add_attachment_message(self, attachment, opts)
     opts = vim.tbl_deep_extend("force", {
         role = config.constants.USER_ROLE,
-        source = "codecompanion-attachments",
+        source = "codecompanion._extensions.attachments",
         bufnr = attachment.bufnr,
     }, opts or {})
 

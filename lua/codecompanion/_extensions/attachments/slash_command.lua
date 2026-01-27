@@ -1,4 +1,4 @@
-local utils = require("codecompanion-attachments.utils")
+local utils = require("codecompanion._extensions.attachments.utils")
 local log = require("codecompanion.utils.log")
 
 local CONSTANTS = {
@@ -17,26 +17,31 @@ local function get_all_extensions()
     return exts
 end
 
----Prepares attachment search directories from config
----@param config table CodeCompanion config
+---Prepares attachment search directories from slash command config
+---@param slash_cmd_config table Slash command config (from SlashCommand.config)
 ---@return table Search directories
-local function prepare_search_dirs(config)
+local function prepare_search_dirs(slash_cmd_config)
     local search_dirs = {}
 
-    -- Include attachment dirs if configured
-    local attachment_dirs = config.interactions.chat.slash_commands.attachment
-        and config.interactions.chat.slash_commands.attachment.opts
-        and config.interactions.chat.slash_commands.attachment.opts.dirs
-    if attachment_dirs and vim.tbl_count(attachment_dirs) > 0 then
-        vim.list_extend(search_dirs, attachment_dirs)
+    -- Include dirs from slash command opts if configured
+    local dirs = slash_cmd_config.opts and slash_cmd_config.opts.dirs
+    if dirs and vim.tbl_count(dirs) > 0 then
+        vim.list_extend(search_dirs, dirs)
     end
 
-    -- Include image dirs if configured (for backwards compat)
-    local image_dirs = config.interactions.chat.slash_commands.image
-        and config.interactions.chat.slash_commands.image.opts
-        and config.interactions.chat.slash_commands.image.opts.dirs
-    if image_dirs and vim.tbl_count(image_dirs) > 0 then
-        vim.list_extend(search_dirs, image_dirs)
+    -- If no dirs specified, try to get from global config as fallback
+    if vim.tbl_count(search_dirs) == 0 then
+        local ok, global_config = pcall(require, "codecompanion.config")
+        if ok and global_config.interactions and global_config.interactions.chat then
+            -- Try image dirs for backwards compat
+            local image_dirs = global_config.interactions.chat.slash_commands
+                and global_config.interactions.chat.slash_commands.image
+                and global_config.interactions.chat.slash_commands.image.opts
+                and global_config.interactions.chat.slash_commands.image.opts.dirs
+            if image_dirs and vim.tbl_count(image_dirs) > 0 then
+                vim.list_extend(search_dirs, image_dirs)
+            end
+        end
     end
 
     return search_dirs
@@ -202,7 +207,10 @@ local choice = {
     ---@param SlashCommands CodeCompanion.SlashCommands
     ---@return nil
     File = function(SlashCommand, SlashCommands)
-        return SlashCommands:set_provider(SlashCommand, providers)
+        log:debug("File picker selected, config.opts: %s", vim.inspect(SlashCommand.config.opts))
+        local provider_fn = SlashCommands:set_provider(SlashCommand, providers)
+        log:debug("Provider function: %s", type(provider_fn))
+        return provider_fn
     end,
 
     ---Share the URL of an attachment
@@ -285,7 +293,7 @@ end
 function SlashCommand:output(selected, opts)
     opts = opts or {}
     -- Set source to attachment command
-    opts.source = "codecompanion-attachments.slash_command"
+    opts.source = "codecompanion._extensions.attachments.slash_command"
 
     if selected.source == "file" then
         -- Files API reference - no encoding needed
