@@ -74,6 +74,7 @@ local providers = {
 
 	---The Snacks.nvim provider
 	---@param SlashCommand CodeCompanion.SlashCommand
+	---@return nil
 	snacks = function(SlashCommand)
 		local snacks = require("codecompanion.providers.slash_commands.snacks")
 		snacks = snacks.new({
