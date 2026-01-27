@@ -1,35 +1,20 @@
 # codecompanion-attachments.nvim
 
-Upload documents and images to your LLM conversations in CodeCompanion.nvim.
-
-This extension adds support for attaching PDFs, Word documents, spreadsheets, and other file types to your chat interactions. It works by patching CodeCompanion adapters to handle document uploads using each provider's native API format.
+Document and image attachment support for [CodeCompanion.nvim](https://codecompanion.olimorris.dev/).
 
 ## Features
 
-- 📎 **Document Upload**: Attach PDFs, DOCX, XLSX, PPTX, RTF, CSV, and more
-- 🖼️ **Image Support**: Works with existing image capabilities (PNG, JPG, GIF, WebP)
-- 🔌 **Adapter Support**: Native integration for Anthropic and Gemini
-- 🔗 **Multiple Sources**: Load from file picker, URLs, or Files API references
-- 🎨 **File Picker Integration**: Works with Telescope, fzf-lua, mini.pick, Snacks, and default picker
-- 🧩 **Pure Extension**: No modifications to CodeCompanion core required
+- 📎 **Document Attachments**: Upload PDFs, text files, markdown, and more
+- 🖼️ **Image Support**: Attach images to your conversations  
+- 🔍 **File Picker**: Browse and select files from your project
+- 🎯 **Multiple Formats**: Support for various document and image formats
+- ⚡ **Smart Integration**: Seamlessly works with CodeCompanion's slash command system
+- 🔧 **Adapter Support**: Works with Anthropic and Gemini adapters
 
-## Supported File Types
+## Requirements
 
-### Documents
-- PDF (`.pdf`)
-- Microsoft Word (`.doc`, `.docx`)
-- Microsoft Excel (`.xls`, `.xlsx`)
-- Microsoft PowerPoint (`.ppt`, `.pptx`)
-- Rich Text Format (`.rtf`)
-- CSV (`.csv`)
-- Plain Text (`.txt`, `.md`)
-
-### Images
-- PNG (`.png`)
-- JPEG (`.jpg`, `.jpeg`)
-- GIF (`.gif`)
-- WebP (`.webp`)
-- BMP (`.bmp`)
+- Neovim >= 0.8.0
+- [codecompanion.nvim](https://codecompanion.olimorris.dev/)
 
 ## Installation
 
@@ -39,34 +24,32 @@ This extension adds support for attaching PDFs, Word documents, spreadsheets, an
 {
     "olimorris/codecompanion.nvim",
     dependencies = {
-        "yourusername/codecompanion-attachments.nvim",
+        "nvim-lua/plenary.nvim",
+        "nvim-treesitter/nvim-treesitter",
+        "hrsh7th/nvim-cmp", -- Optional: For using slash commands
+        "nvim-telescope/telescope.nvim", -- Optional: For using slash commands
+        {
+            "geohar/codecompanion-attachments.nvim",
+            dev = true, -- Remove this if not using local development
+        },
     },
     config = function()
         require("codecompanion").setup({
-            extensions = {
-                "attachments",  -- Extension name without 'codecompanion-' prefix
+            adapters = {
+                anthropic = function()
+                    return require("codecompanion.adapters").extend("anthropic", {
+                        env = { ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY" },
+                        opts = {
+                            attachment_upload = true, -- REQUIRED for documents
+                        },
+                    })
+                end,
             },
-        })
-    end,
-}
-```
-
-Or with options:
-
-```lua
-{
-    "olimorris/codecompanion.nvim",
-    dependencies = {
-        "yourusername/codecompanion-attachments.nvim",
-    },
-    config = function()
-        require("codecompanion").setup({
             extensions = {
                 attachments = {
-                    enabled = true,  -- defaults to true
+                    enabled = true,
                     opts = {
-                        -- Custom adapter transformers
-                        adapters = {},
+                        dirs = { "." }, -- Directories to search for files
                     },
                 },
             },
@@ -75,202 +58,179 @@ Or with options:
 }
 ```
 
-### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+**IMPORTANT**: Make sure to set `dev = true` and configure lazy.nvim's dev path if installing from a local directory:
 
 ```lua
-use {
-    "olimorris/codecompanion.nvim",
-    requires = {
-        "yourusername/codecompanion-attachments.nvim",
+require("lazy").setup({
+    dev = {
+        path = "~/Development/neovim-plugins", -- Adjust to your path
     },
-    config = function()
-        require("codecompanion").setup({
-            extensions = {
-                "attachments",  -- Extension name without 'codecompanion-' prefix
-            },
-        })
-    end,
-}
+    -- ... your plugins
+})
 ```
 
 ## Configuration
 
-### Basic Setup
+### Enable Attachment Upload for Your Adapter
 
-The extension automatically registers the `/attachment` slash command and patches supported adapters. No additional configuration required for basic usage.
-
-### Custom Attachment Directories
-
-Configure search directories for the file picker:
-
+For **Anthropic** (Claude):
 ```lua
-require("codecompanion").setup({
-    interactions = {
-        chat = {
-            slash_commands = {
-                attachment = {
-                    opts = {
-                        dirs = {
-                            "~/Documents",
-                            "~/Downloads",
-                        },
-                    },
-                },
+adapters = {
+    anthropic = function()
+        return require("codecompanion.adapters").extend("anthropic", {
+            opts = {
+                attachment_upload = true, -- Required
             },
-        },
-    },
-    extensions = {
-        "attachments",
-    },
-})
+        })
+    end,
+}
 ```
 
-### Custom Adapter Transformers
+For **Gemini**:
+```lua
+adapters = {
+    gemini = function()
+        return require("codecompanion.adapters").extend("gemini", {
+            opts = {
+                attachment_upload = true, -- Required
+            },
+        })
+    end,
+}
+```
 
-Add support for additional adapters by registering custom transformers:
+### Extension Options
 
 ```lua
-require("codecompanion").setup({
-    extensions = {
-        attachments = {
-            enabled = true,
-            opts = {
-                adapters = {
-                    my_custom_adapter = function(messages, adapter)
-                        -- Transform attachment messages for your adapter
-                        for _, m in ipairs(messages) do
-                            if m._meta and m._meta.tag == "attachment" and m.context then
-                                -- Apply your transformation logic here
-                                m.content = transform_for_my_adapter(m)
-                            end
-                        end
-                        return messages
-                    end,
-                },
-            },
+extensions = {
+    attachments = {
+        enabled = true,
+        opts = {
+            -- Directories to search when picking files
+            dirs = { "." },
+            
+            -- File patterns to include/exclude (optional)
+            -- Uses telescope's file_ignore_patterns if not specified
         },
     },
-})
+}
 ```
 
 ## Usage
 
-### In Chat
+### Basic Usage
 
-1. Open a CodeCompanion chat (`:CodeCompanion`)
-2. Type `/attachment` and press enter
-3. Choose your attachment source:
-   - **File**: Browse and select files using your configured picker
-   - **URL**: Enter a URL to download and attach
-   - **Files API**: Reference a file uploaded to the provider's Files API (if supported)
+1. Open a CodeCompanion chat: `:CodeCompanionChat`
+2. Type `/attachment` and press `<Tab>` or `<CR>`
+3. Browse and select your document or image
+4. The file will be attached to your next message
+5. Ask questions about the attached content!
 
-### Attachment Sources
+### Supported File Types
 
-#### File Picker
+**Documents**:
+- PDF (`.pdf`)
+- Text files (`.txt`)
+- Markdown (`.md`)
+- Source code (`.lua`, `.py`, `.js`, `.ts`, etc.)
+- And many more...
+
+**Images**:
+- PNG (`.png`)
+- JPEG (`.jpg`, `.jpeg`)  
+- GIF (`.gif`)
+- WebP (`.webp`)
+
+### Example Workflow
+
 ```
-/attachment
-> File
-```
-Browse your filesystem using your preferred picker (Telescope, fzf, etc.)
+:CodeCompanionChat
 
-#### URL
-```
-/attachment
-> URL
-> https://example.com/document.pdf
-```
-Download and attach files from URLs
+> /attachment
+[Select a PDF document]
 
-#### Files API
+> What are the key points in this document?
+[Claude analyzes the document and responds]
 ```
-/attachment
-> Files API
-> file_12345abcde
-```
-Reference files already uploaded to provider's storage (Anthropic, etc.)
-
-## Adapter Compatibility
-
-| Adapter | Document Upload | URL Upload | Files API | Status |
-|---------|----------------|------------|-----------|---------|
-| Anthropic | ✅ | ✅ | ✅ | Full support |
-| Gemini | ✅ | ✅ | ❌ | Partial support |
-| Gemini CLI | ✅ | ✅ | ❌ | Partial support |
-| OpenAI | 📋 | 📋 | 📋 | Planned |
-| Copilot | 📋 | 📋 | 📋 | Planned |
 
 ## How It Works
 
-The extension uses a **monkey-patching** approach to add attachment support without modifying CodeCompanion core:
+The extension:
 
-1. **Adapter Patching**: Wraps the `adapters.resolve()` function to intercept adapter creation
-2. **Message Transformation**: Patches each adapter's `form_messages()` handler to transform attachment messages into the provider's native format
-3. **Chat Integration**: Adds the `add_attachment_message()` method to the Chat class
-4. **Slash Command**: Registers the `/attachment` command through CodeCompanion's extension system
+1. **Registers a `/attachment` slash command** that integrates with CodeCompanion's command system
+2. **Patches adapter handlers** to transform attachment messages into the proper API format (Anthropic's document blocks or Gemini's inline_data)
+3. **Preserves metadata** during transformation so attachments are properly identified
+4. **Encodes files** as base64 and includes proper MIME type detection
 
-### Architecture
+### Technical Details
 
-```
-User Input (/attachment)
-    ↓
-Slash Command Handler
-    ↓
-File Picker / URL Input / Files API
-    ↓
-Utils (encode, validate)
-    ↓
-Chat:add_attachment_message()
-    ↓
-Message with _meta.tag = "attachment"
-    ↓
-Adapter form_messages() [PATCHED]
-    ↓
-Transform to provider format
-    ↓
-Send to LLM
-```
+- Uses CodeCompanion's extension system (loaded via `lua/codecompanion/_extensions/attachments/`)
+- Monkey-patches `form_messages` handler to transform attachments BEFORE processing
+- Supports both base64-encoded attachments and URL-based attachments (Anthropic)
+- Future support planned for Anthropic's Files API
 
 ## Troubleshooting
 
-### Slash command not showing up
+### Slash Command Not Appearing
 
-Make sure the extension is loaded:
-```lua
-require("codecompanion").setup({
-    extensions = {
-        "attachments",
-    },
-})
+1. Make sure the plugin is installed via lazy.nvim
+2. Check that `extensions.attachments.enabled = true` in your config
+3. Restart Neovim completely
+4. Run `:Lazy sync` to ensure the plugin is loaded
+
+### "Prompt Too Long" Error
+
+This usually means the transformation isn't happening. Check:
+
+1. **Adapter configuration**: Ensure `attachment_upload = true` is set
+2. **Debug logs**: Enable debug logging and check `:CodeCompanionLog`:
+   ```lua
+   require("codecompanion").setup({
+       opts = {
+           log_level = "DEBUG",
+       },
+   })
+   ```
+3. **Look for these log messages**:
+   - `"Patched adapter 'anthropic' for attachment support"`
+   - `"Found attachment message"`
+   - `"Transformed to document content block"`
+
+### Extension Not Loading
+
+Check the CodeCompanion log (`:CodeCompanionLog`) for errors like:
+```
+Error loading extension attachments: module 'codecompanion._extensions.attachments' not found
 ```
 
-### Attachments not working with my adapter
+This means the plugin isn't installed properly. Verify:
+- Plugin is in lazy.nvim's plugin directory
+- No `.cloning` lock files in `~/.local/share/nvim/lazy/`
+- Run `:Lazy clean` then `:Lazy sync`
 
-Check adapter compatibility table above. The adapter must have `attachment_upload = true` in its opts.
+## Development
 
-### File too large
+### Project Structure
 
-Most providers have size limits:
-- Anthropic: 32MB per file
-- Gemini: 20MB per file
-
-### Enable debug logging
-
-```lua
-require("codecompanion").setup({
-    log_level = "DEBUG",
-})
+```
+lua/codecompanion/_extensions/attachments/
+├── init.lua              # Extension entry point, setup()
+├── adapter_patches.lua   # Monkey patches for adapters
+├── chat_integration.lua  # Chat class modifications
+├── slash_command.lua     # /attachment command implementation
+└── utils.lua            # Encoding, MIME detection
 ```
 
-Then check `:CodeCompanionLog` for detailed information.
+### Testing Changes
+
+1. Make your changes in the plugin directory
+2. Restart Neovim (or run `:Lazy reload codecompanion-attachments.nvim`)
+3. Test with `:CodeCompanionChat` and `/attachment`
+4. Check logs with `:CodeCompanionLog` (set `log_level = "DEBUG"`)
 
 ## Contributing
 
-Contributions welcome! To add support for a new adapter:
-
-1. Create a transformer function in `adapter_patches.lua`
-2. Add the adapter to the `transformers` table
-3. Update the compatibility table in this README
-4. Submit a PR
+Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
@@ -278,4 +238,5 @@ MIT
 
 ## Credits
 
-Based on PR [#2632](https://github.com/olimorris/codecompanion.nvim/pull/2632) by the CodeCompanion community. Refactored as an extension to maintain separation of concerns and enable community-driven adapter support.
+- Built as an extension for [CodeCompanion.nvim](https://codecompanion.olimorris.dev/) by [@olimorris](https://github.com/olimorris)
+- Inspired by the attachment handling in the original CodeCompanion fork
