@@ -1,6 +1,9 @@
-# Test files
+# Test and development files
 test_load.lua
 test_config.lua
+test_transformation.lua
+test_attachment.txt
+diagnostics.lua
 
 # Neovim
 *.swp
@@ -16,3 +19,6 @@ lazy-lock.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Development documentation (session-specific)
+.codecompanion/
