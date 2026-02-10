@@ -91,12 +91,15 @@ local providers = {
 		local dirs = prepare_search_dirs(SlashCommand.config)
 		local ft = get_all_extensions()
 
-		snacks.provider.picker.pick("files", {
-			confirm = snacks:display(),
-			dirs = dirs,
-			ft = ft,
-			main = { file = false, float = true },
-		})
+        snacks.provider.picker.pick("files", {
+            confirm = snacks:display(),
+            dirs = dirs,
+            ft = ft,
+            main = { file = false, float = true },
+            layout = {
+                hidden = { "preview" },
+            },
+        })
 	end,
 
 	---The Telescope provider
