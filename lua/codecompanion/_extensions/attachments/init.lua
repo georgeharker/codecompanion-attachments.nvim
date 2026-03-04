@@ -38,7 +38,7 @@ function M.setup(opts)
 			or require("codecompanion.providers").pickers
 
 		config.interactions.chat.slash_commands["attachment"] = {
-			callback = "codecompanion._extensions.attachments.slash_command",
+			path = "_extensions.attachments.slash_command",
 			description = "Upload documents and images as attachments",
 			enabled = require("codecompanion._extensions.attachments.slash_command").enabled,
 			opts = {
