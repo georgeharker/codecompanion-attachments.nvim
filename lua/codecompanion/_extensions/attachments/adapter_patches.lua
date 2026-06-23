@@ -1,4 +1,3 @@
-local adapter_utils = require("codecompanion.utils.adapters")
 local log = require("codecompanion.utils.log")
 
 local M = {}
